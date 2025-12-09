@@ -31,9 +31,10 @@ export const translations = {
 
     // Test Case Generator
     linearTicketNumbers: "Linear Ticket",
-    ticketNumbersDescription: "Enter a Linear issue ID or paste the description below.",
-    ticketNumbers: "Issue ID",
-    issueHint: "Leave blank if you provide the description directly.",
+    ticketNumbersDescription:
+      "Enter one or more Linear issue IDs (comma, space, or newline separated) or paste the description below.",
+    ticketNumbers: "Issue IDs",
+    issueHint: "Separate IDs with commas/spaces/newlines. URLs are OK.",
     testCaseCount: "Number of Test Cases",
     testCaseCountHint: "Optional. Leave empty for key scenarios only.",
     model: "Model",
@@ -99,9 +100,10 @@ export const translations = {
 
     // Test Case Generator
     linearTicketNumbers: "Linear チケット番号",
-    ticketNumbersDescription: "Linear のチケットIDを入力するか、下に説明を貼り付けてください。",
-    ticketNumbers: "チケットID",
-    issueHint: "説明を直接入力する場合は空欄でもOK。",
+    ticketNumbersDescription:
+      "1つ以上の Linear チケットIDを入力するか、下に説明を貼り付けてください。（カンマ / スペース / 改行で区切り可）",
+    ticketNumbers: "チケットID（複数可）",
+    issueHint: "複数の場合はカンマ・スペース・改行で区切ってください。Linear の URL 貼り付けでもOKです。",
     testCaseCount: "テストケース数",
     testCaseCountHint: "任意。空欄なら重要なケースのみ生成。",
     model: "モデル",

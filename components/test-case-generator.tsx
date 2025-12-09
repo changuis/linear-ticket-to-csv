@@ -91,7 +91,7 @@ export function TestCaseGenerator() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          issueId: issueId || undefined,
+          issueIds: issueId || undefined,
           description: description || undefined,
           cases: casesNumber,
           model,
@@ -163,11 +163,13 @@ export function TestCaseGenerator() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="issue">{t.ticketNumbers}</Label>
-              <Input
+              <Textarea
                 id="issue"
-                placeholder="ENG-123"
+                placeholder="ENG-123, ENG-124"
                 value={issueId}
                 onChange={(e) => setIssueId(e.target.value)}
+                rows={3}
+                className="font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">{t.issueHint}</p>
             </div>

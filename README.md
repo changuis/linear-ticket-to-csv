@@ -17,7 +17,7 @@ npm run dev
 `POST /api/generate-test-cases` body:
 ```json
 {
-  "issueId": "ENG-123",
+  "issueIds": ["ENG-123", "ENG-124"],
   "description": "optional direct description",
   "model": "gpt-4o-mini",
   "cases": 5,
@@ -25,6 +25,7 @@ npm run dev
   "linearApiKey": "optional override"
 }
 ```
+`issueIds` also accepts a single string separated by commas, spaces, or newlines.
 
 Response:
 ```json

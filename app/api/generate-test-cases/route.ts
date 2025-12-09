@@ -6,6 +6,7 @@ const CSV_HEADER = "項目,ユーザーロール（管理者かユーザー）,�
 
 type RequestBody = {
   issueId?: string
+  issueIds?: string | string[]
   description?: string
   model?: string
   cases?: number
@@ -25,6 +26,30 @@ function normalizeIssueInput(input: string): string {
   const match = trimmed.match(/([A-Z]+-\d+)/)
   if (match?.[1]) return match[1]
   return trimmed
+}
+
+function parseIssueInputs(input?: string | string[]): string[] {
+  const values = Array.isArray(input) ? input : [input ?? ""]
+  const results = new Set<string>()
+
+  for (const value of values) {
+    if (!value) continue
+    const tokens = value
+      .split(/[\s,;]+/)
+      .map((part) => part.trim())
+      .filter(Boolean)
+
+    for (const token of tokens) {
+      const matches = token.match(/[A-Za-z]+-\d+/g)
+      if (matches?.length) {
+        matches.forEach((id) => results.add(normalizeIssueInput(id)))
+        continue
+      }
+      results.add(normalizeIssueInput(token))
+    }
+  }
+
+  return Array.from(results)
 }
 
 function splitIdentifier(identifier: string): { teamKey: string; number: number } | null {
@@ -149,11 +174,14 @@ async function fetchIssueByTeamAndNumber(teamKey: string, number: number, apiKey
   return issuePayload.data?.issues?.nodes?.[0] ?? null
 }
 
-function buildPrompt(description: string, cases?: number) {
+function buildPrompt(description: string, cases?: number, issueIds?: string[]) {
   const caseHint = cases ? `Generate exactly ${cases} test cases.` : "Generate a concise set of the most important test cases."
+  const ticketsHint = issueIds?.length
+    ? `Descriptions are combined from ${issueIds.length} Linear ticket${issueIds.length > 1 ? "s" : ""}: ${issueIds.join(", ")}. Cover scenarios across all of them.`
+    : "Use the Linear ticket description below to produce test cases in Japanese."
 
   return `
-Use the Linear ticket description below to produce test cases in Japanese.
+${ticketsHint}
 ${caseHint}
 
 Output format:
@@ -228,6 +256,7 @@ export async function POST(request: NextRequest) {
   const cases = body.cases && Number.isFinite(body.cases) ? body.cases : undefined
   const openaiKey = body.openaiApiKey || process.env.OPENAI_API_KEY
   const linearKey = body.linearApiKey || process.env.LINEAR_API_KEY
+  const issueInputs = parseIssueInputs(body.issueIds ?? body.issueId)
 
   if (!openaiKey) {
     return NextResponse.json({ error: "OPENAI_API_KEY is required (env or request payload)." }, { status: 400 })
@@ -235,22 +264,45 @@ export async function POST(request: NextRequest) {
 
   let description = body.description?.trim()
   if (!description) {
-    if (!body.issueId) {
-      return NextResponse.json({ error: "issueId or description is required." }, { status: 400 })
+    if (issueInputs.length === 0) {
+      return NextResponse.json({ error: "issueId(s) or description is required." }, { status: 400 })
     }
     if (!linearKey) {
       return NextResponse.json({ error: "LINEAR_API_KEY is required to fetch from Linear." }, { status: 400 })
     }
-    try {
-      const normalizedIssueId = normalizeIssueInput(body.issueId)
-      description = await fetchLinearDescription(normalizedIssueId, linearKey)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+
+    const fetchedDescriptions: string[] = []
+    const failures: { id: string; message: string }[] = []
+
+    for (const issueId of issueInputs) {
+      try {
+        const normalizedIssueId = normalizeIssueInput(issueId)
+        const desc = await fetchLinearDescription(normalizedIssueId, linearKey)
+        fetchedDescriptions.push(desc)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        failures.push({ id: issueId, message })
+      }
+    }
+
+    if (fetchedDescriptions.length === 0) {
+      const firstFailure = failures[0]?.message ?? "Unknown error."
       return NextResponse.json(
-        { error: `Failed to fetch Linear description: ${message}` },
+        { error: `Failed to fetch Linear description: ${firstFailure}` },
         { status: 400 },
       )
     }
+
+    if (failures.length > 0) {
+      const failedIds = failures.map((f) => f.id).join(", ")
+      const detail = failures[0]?.message ?? "Unknown error."
+      return NextResponse.json(
+        { error: `Failed to fetch Linear description for: ${failedIds}. ${detail}` },
+        { status: 400 },
+      )
+    }
+
+    description = fetchedDescriptions.join("\n\n---\n\n")
   }
 
   try {
@@ -263,7 +315,7 @@ export async function POST(request: NextRequest) {
           content:
             "You are a QA specialist who writes succinct, high-quality test cases in Japanese. Always follow the requested CSV format.",
         },
-        { role: "user", content: buildPrompt(description!, cases) },
+        { role: "user", content: buildPrompt(description!, cases, issueInputs.length ? issueInputs : undefined) },
       ],
       temperature: 0.3,
     })
